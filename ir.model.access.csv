@@ -1,0 +1,38 @@
+# -*- coding: utf-8 -*-
+from odoo import models, fields, api
+from odoo.exceptions import ValidationError
+
+
+class DebtCollectionPayment(models.Model):
+    _name = 'debt.collection.payment'
+    _description = 'Debt Collection Payment Line'
+    _order = 'payment_date desc'
+
+    debt_id = fields.Many2one(
+        'debt.collection.record', string='Debt Record',
+        required=True, ondelete='cascade')
+    payment_date = fields.Date(
+        string='Payment Date', required=True, default=fields.Date.context_today)
+    amount = fields.Monetary(string='Amount', required=True)
+    currency_id = fields.Many2one(
+        related='debt_id.currency_id', string='Currency', store=True)
+    note = fields.Char(string='Note')
+
+    # helpful for grouping/reporting by month without extra computation
+    payment_month = fields.Char(
+        string='Payment Month', compute='_compute_payment_month', store=True)
+
+    patient_name = fields.Char(related='debt_id.patient_name', store=True, string='Patient Name')
+    responsible_user_id = fields.Many2one(
+        related='debt_id.responsible_user_id', store=True, string='Responsible')
+
+    @api.depends('payment_date')
+    def _compute_payment_month(self):
+        for rec in self:
+            rec.payment_month = rec.payment_date.strftime('%Y-%m') if rec.payment_date else False
+
+    @api.constrains('amount')
+    def _check_amount(self):
+        for rec in self:
+            if rec.amount <= 0:
+                raise ValidationError('Payment amount must be greater than zero.')
